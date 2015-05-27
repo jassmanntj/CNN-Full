@@ -150,22 +150,72 @@ public class ImageLoader {
         }
     }
 
-    public DoubleMatrix[][] getImgArr(int i, int batch) {
-        DoubleMatrix[][] images = new DoubleMatrix[imgArr.length-batch][];
+    public DoubleMatrix[][] getImgArr(int i, boolean flipHorizontal, boolean flipVertical,  int batch) {
+        int multiplier = flipHorizontal ? 2:1;
+        multiplier *= flipVertical ? 2:1;
+        DoubleMatrix[][] images = new DoubleMatrix[(imgArr.length-batch)*multiplier][];
         int k = 0;
         for(int j = 0; j < imgArr.length; j++) {
-            if(j < i*batch || j >= i*batch+batch) images[k++] = imgArr[j];
+            if(j < i*batch || j >= i*batch+batch) {
+                images[k++] = imgArr[j];
+                if(flipHorizontal) {
+                    images[k] = new DoubleMatrix[imgArr[j].length];
+                    for (int l = 0; l < imgArr[j].length; l++) {
+                        images[k][l] = Utils.flipHorizontal(imgArr[j][l]);
+                    }
+                    k++;
+                    if(flipVertical) {
+                        images[k] = new DoubleMatrix[imgArr[j].length];
+                        for (int l = 0; l < imgArr[j].length; l++) {
+                            images[k][l] = Utils.reverseMatrix(imgArr[j][l]);
+                        }
+                        k++;
+                    }
+                }
+                if(flipVertical) {
+                    images[k] = new DoubleMatrix[imgArr[j].length];
+                    for (int l = 0; l < imgArr[j].length; l++) {
+                        images[k][l] = Utils.flipVertical(imgArr[j][l]);
+                    }
+                    k++;
+                }
+            }
         }
-        return normalizeData(images);
+        return Utils.ZCAWhiten(images, 1e-4);//normalizeData(images);
     }
 
-    public DoubleMatrix[][] getTestArr(int i, int batch) {
-        DoubleMatrix[][] images = new DoubleMatrix[batch][];
+    public DoubleMatrix[][] getTestArr(int i, boolean flipHorizontal, boolean flipVertical, int batch) {
+        int multiplier = flipHorizontal ? 2:1;
+        multiplier *= flipVertical ? 2:1;
+        DoubleMatrix[][] images = new DoubleMatrix[multiplier*batch][];
         int k = 0;
         for(int j = 0; j < imgArr.length; j++) {
-            if(j >= i*batch && j < i*batch+batch) images[k++] = imgArr[j];
+            if(j >= i*batch && j < i*batch+batch) {
+                images[k++] = imgArr[j];
+                if(flipHorizontal) {
+                    images[k] = new DoubleMatrix[imgArr[j].length];
+                    for (int l = 0; l < imgArr[j].length; l++) {
+                        images[k][l] = Utils.flipHorizontal(imgArr[j][l]);
+                    }
+                    k++;
+                    if(flipVertical) {
+                        images[k] = new DoubleMatrix[imgArr[j].length];
+                        for (int l = 0; l < imgArr[j].length; l++) {
+                            images[k][l] = Utils.reverseMatrix(imgArr[j][l]);
+                        }
+                        k++;
+                    }
+                }
+                if(flipVertical) {
+                    images[k] = new DoubleMatrix[imgArr[j].length];
+                    for (int l = 0; l < imgArr[j].length; l++) {
+                        images[k][l] = Utils.flipVertical(imgArr[j][l]);
+                    }
+                    k++;
+                }
+            }
         }
-        return normalizeData(images);
+        return Utils.ZCAWhiten(images, 1e-4);//normalizeData(images);
     }
 
     private int[] countImages(File folder, HashMap<String, Double> labelMap) {
@@ -233,7 +283,7 @@ public class ImageLoader {
         }
         executor.shutdown();
         while(!executor.isTerminated());
-        return normalizeData(patches);
+        return patches;//normalizeData(patches);
     }
 
     public static DoubleMatrix[][] normalizeData(DoubleMatrix[][] data) {
@@ -247,12 +297,9 @@ public class ImageLoader {
                 data[i][j].subi(mean);
                 var += data[i][j].mul(data[i][j]).mean()/data[i].length;
             }
-        }
-        var /= data.length;
 
-        double stdev = Math.sqrt(var);
-        double pstd = 3 * stdev;
-        for(int i = 0; i < data.length; i++) {
+            double stdev = Math.sqrt(var);
+            double pstd = 3 * stdev;
             for(int j = 0; j < data[i].length; j++) {
                 for(int k = 0; k < data[i][j].length; k++) {
                     double x = data[i][j].get(k);
@@ -285,7 +332,7 @@ public class ImageLoader {
 				data.put(i, j, val);
 			}
 		}
-        data.addi(1).muli(.5);
+        data.addi(1).muli(.4).addi(0.1);
 		return data;
 	}
 
@@ -294,7 +341,7 @@ public class ImageLoader {
         for(int i = 1; i < labelMap.size(); i++) {
             imgs = DoubleMatrix.concatVertically(imgs, images[i]);
         }
-		return normalizeData(imgs);
+		return imgs;//normalizeData(imgs);
 	}
 
     public void sortImgs(int i) {
@@ -361,23 +408,60 @@ public class ImageLoader {
         return testLbls;
     }
 
-	public DoubleMatrix getLabels(int i, int batch) {
+	public DoubleMatrix getLabels(int i, boolean flipHorizontal, boolean flipVertical, int batch) {
         DoubleMatrix labs = null;
         for(int j = 0; j < lbls.rows; j++) {
             if(j < i*batch || j >= i*batch+batch) {
-                if (labs == null) labs = lbls.getRow(j);
-                else labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                if (labs == null) {
+                    labs = lbls.getRow(j);
+                    if(flipHorizontal)  {
+                        labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                        if(flipVertical) {
+                            labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                        }
+                    }
+                    if(flipVertical) labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+
+                }
+                else {
+                    labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                    if(flipHorizontal) {
+                        labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                        if (flipVertical) {
+                            labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                        }
+                    }
+                    if(flipVertical) labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                }
             }
         }
         return labs;
 	}
 
-    public DoubleMatrix getTestLabels(int i, int batch) {
+    public DoubleMatrix getTestLabels(int i, boolean flipHorizontal, boolean flipVertical, int batch) {
         DoubleMatrix labs = null;
         for(int j = 0; j < lbls.rows; j++) {
             if(j >= i*batch && j < i*batch+batch) {
-                if(labs == null) labs = lbls.getRow(j);
-                else labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                if (labs == null) {
+                    labs = lbls.getRow(j);
+                    if (flipHorizontal) {
+                        labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                        if (flipVertical) {
+                            labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                        }
+                    }
+                    if (flipVertical) labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                }
+                else {
+                    labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                    if(flipHorizontal) {
+                        labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                        if (flipVertical) {
+                            labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                        }
+                    }
+                    if(flipVertical) labs = DoubleMatrix.concatVertically(labs, lbls.getRow(j));
+                }
             }
         }
         return labs;

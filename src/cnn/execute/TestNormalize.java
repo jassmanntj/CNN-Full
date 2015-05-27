@@ -17,7 +17,7 @@ public class TestNormalize {
         File folder = new File("C:\\Users\\jassmanntj\\Desktop\\CA-Leaves2");
         HashMap<String, Double> labelMap = loader.getLabelMap(folder);
         loader.loadFolder(folder, 3, 60, 80, labelMap);
-        DoubleMatrix[][] images = loader.getImgArr(0, 30);
+        DoubleMatrix[][] images = loader.getImgArr(0, false, false, 30);
         DoubleMatrix imgs = loader.getImgs();
         System.out.println(images[0][0]);
         System.out.println(imgs);

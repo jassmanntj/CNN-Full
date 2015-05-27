@@ -8,7 +8,10 @@ import java.util.concurrent.Executors;
 
 
 /**
- * Created by jassmanntj on 3/25/2015.
+ * ConvolutionLayer
+ *
+ * @author Tim Jassmann
+ * @version 05/26/2015
  */
 public class ConvolutionLayer extends ConvPoolLayer {
     private DoubleMatrix theta[][];
@@ -17,41 +20,84 @@ public class ConvolutionLayer extends ConvPoolLayer {
     private double aVelocity;
     private DoubleMatrix bias;
     private DoubleMatrix biasVelocity;
-    private int patchDim;
-    private int layer1 = Utils.PRELU;
+    private int featureDim;
+    private int costFunction;
+    private double lambda;
+    private final double dropout;
+    private DoubleMatrix z[][];
 
-    public ConvolutionLayer(int numFeatures, int channels, int patchDim) {
-        this.patchDim = patchDim;
-
+    /**
+     * ConvolutionLayer - constructor for ConvolutionLayer
+     *
+     * Parameters:
+     * @param numFeatures number of features
+     * @param channels number of input channels
+     * @param featureDim size of feature
+     * @param lambda weight decay
+     * @param dropout percentage of output neurons omitted via dropout in training
+     * @param costFunction cost function to use
+     */
+    public ConvolutionLayer(int numFeatures, int channels, int featureDim, double lambda, double dropout, int costFunction) {
+        this.featureDim = featureDim;
+        this.lambda = lambda;
+        this.dropout = dropout;
+        this.costFunction = costFunction;
         bias = new DoubleMatrix(numFeatures);
         biasVelocity = new DoubleMatrix(numFeatures);
         theta = new DoubleMatrix[numFeatures][channels];
         thetaVelocity = new DoubleMatrix[numFeatures][channels];
-
         for(int i = 0; i < numFeatures; i++) {
             for(int j = 0; j < channels; j++) {
-                theta[i][j] = initializeTheta(patchDim, numFeatures);
-                thetaVelocity[i][j] = new DoubleMatrix(patchDim, patchDim);
+                theta[i][j] = initializeTheta(featureDim, channels);
+                thetaVelocity[i][j] = new DoubleMatrix(featureDim, featureDim);
             }
         }
-        a = .25;
+        if(costFunction == Utils.PRELU) a = .25;
+        else a = 0;
     }
 
-    public void pretrain(DoubleMatrix[][] images, int numFeatures, int iterations) {
-        LinearDecoder ae = new LinearDecoder(patchDim, theta[0].length, numFeatures, 0.035, 3e-3, 5, 1e-3);
-        DoubleMatrix patches = ImageLoader.sample(patchDim, patchDim, 10000, images);
+    /**
+     * pretrain - pretrains the weights of the layer
+     * TODO: implementation
+     * Parameters:
+     * @param input input to layer
+     * @param iterations number of iterations of pretraining
+     */
+    public void pretrain(DoubleMatrix[][] input, int iterations) {
+        /*DoubleMatrix patches = ImageLoader.sample(featureDim, featureDim, 10000, input);
+        FCLayer ae = new FCLayer(patches.columns, theta.length, 0.035, 3e-3, 5, 1e-3, 0.5);
         ae.train(patches, patches, iterations);
-        this.theta = ae.getThetaArr();
+        this.theta = ae.getThetaArr(featureDim);
         this.bias = ae.getBias();
+        this.a = ae.getA();*/
     }
 
-    private DoubleMatrix initializeTheta(int patchDim, int numFeatures) {
-        double stdev = Math.sqrt(2.0/(patchDim*patchDim*numFeatures));
-        DoubleMatrix res = DoubleMatrix.randn(patchDim, patchDim);
+    /**
+     * initializeTheta - initializes the theta values of a feature of the layer
+     * 
+     * Parameters:
+     * @param featureDim The dimension of the features
+     * @param channels The number of input channels
+     *
+     * Return:
+     * @return initialized values for theta
+     */
+    private DoubleMatrix initializeTheta(int featureDim, int channels) {
+        double stdev = Math.sqrt(2.0/((1+a*a)*featureDim*featureDim*channels));
+        DoubleMatrix res = DoubleMatrix.randn(featureDim, featureDim);
         res.muli(stdev);
         return res;
     }
 
+    /**
+     * compute - computes the output of the layer (using all layers)
+     *
+     * Parameters:
+     * @param input input to the layer
+     *
+     * Return:
+     * @return The output of the layer
+     */
     public DoubleMatrix[][] compute(final DoubleMatrix[][] input) {
         final DoubleMatrix[][] result = new DoubleMatrix[input.length][theta.length];
 
@@ -69,7 +115,7 @@ public class ConvolutionLayer extends ConvPoolLayer {
                     for(int channel = 0; channel < theta[feature].length; channel++) {
                         res.addi(Utils.conv2d(input[imageNum][channel], theta[feature][channel], true));
                     }
-                    result[imageNum][feature] = Utils.activationFunction(layer1, res.add(bias.get(feature)), a);
+                    result[imageNum][feature] = Utils.activationFunction(costFunction, res.add(bias.get(feature)), a).mul(1-dropout);
                 }
             }
         }
@@ -83,53 +129,117 @@ public class ConvolutionLayer extends ConvPoolLayer {
         return result;
     }
 
+    /**
+     * feedForward - compute the output of the layer (with dropout - used for training)
+     *
+     * Parameters:
+     * @param input input to the layer
+     *
+     * Return:
+     * @return output of layer
+     */
+    protected DoubleMatrix[][] feedForward(final DoubleMatrix[][] input) {
+        final DoubleMatrix[][] result = new DoubleMatrix[input.length][theta.length];
+        z = new DoubleMatrix[input.length][theta.length];
+        class ConvolutionThread implements Runnable {
+            private int imageNum;
 
-    public DoubleMatrix[][] gradientCheck(CostResult cr, DoubleMatrix[][] in, DoubleMatrix labels, NeuralNetwork cnn) {
-        double epsilon = 0.0001;
+            public ConvolutionThread(int imageNum) {
+                this.imageNum = imageNum;
+            }
+
+            @Override
+            public void run() {
+                for(int feature = 0; feature < theta.length; feature++) {
+                    DoubleMatrix res = new DoubleMatrix(input[imageNum][0].rows-theta[0][0].rows+1, input[imageNum][0].columns-theta[0][0].columns+1);
+                    for(int channel = 0; channel < theta[feature].length; channel++) {
+                        res.addi(Utils.conv2d(input[imageNum][channel], theta[feature][channel], true));
+                    }
+                    DoubleMatrix drop = DoubleMatrix.rand(res.rows, res.columns).ge(dropout);
+                    z[imageNum][feature] = res.add(bias.get(feature));
+                    result[imageNum][feature] = Utils.activationFunction(costFunction, z[imageNum][feature], a).mul(drop);
+                }
+            }
+        }
+        ExecutorService executor = Executors.newFixedThreadPool(Utils.NUMTHREADS);
+        for(int imageNum = 0; imageNum < input.length; imageNum++) {
+            Runnable worker = new ConvolutionThread(imageNum);
+            executor.execute(worker);
+        }
+        executor.shutdown();
+        while(!executor.isTerminated());
+        return result;
+    }
+
+    /**
+     * gradientCheck - performs gradient checking on the layer
+     *
+     * Parameters:
+     * @param gradients gradients of the layer
+     * @param in input to the entire network
+     * @param labels expected results of the network
+     * @param cnn neural network this layer belongs to
+     *
+     * Return:
+     * @return gradient propagated through layer
+     */
+    protected DoubleMatrix[][] gradientCheck(Gradients gradients, DoubleMatrix[][] in, DoubleMatrix labels, NeuralNetwork cnn) {
+        double epsilon = 1e-8;
         DoubleMatrix biasG = new DoubleMatrix(bias.length);
         for(int i = 0; i < bias.length; i++) {
             bias.put(i, bias.get(i)+epsilon);
-            CostResult costPlus = cnn.computeCost(in, labels);
+            Gradients gradientsPlus = cnn.computeCost(in, labels);
             bias.put(i, bias.get(i)-2*epsilon);
-            CostResult costMinus = cnn.computeCost(in, labels);
+            Gradients gradientsMinus = cnn.computeCost(in, labels);
             bias.put(i, bias.get(i)+epsilon);
-            biasG.put(i, (costPlus.cost-costMinus.cost)/(2*epsilon));
+            biasG.put(i, (gradientsPlus.cost- gradientsMinus.cost)/(2*epsilon));
         }
-        DoubleMatrix biasA = biasG.add(cr.biasGrad);
-        DoubleMatrix biasS = biasG.sub(cr.biasGrad);
-        System.out.println("CL Bias Diff: "+biasS.norm2()/biasA.norm2());
+        DoubleMatrix biasA = biasG.add(gradients.biasGrad);
+        DoubleMatrix biasS = biasG.sub(gradients.biasGrad);
+        System.out.println("CL Bias Diff: " + biasS.norm2() / biasA.norm2());
 
         for(int i = 0; i < theta.length; i++) {
             for(int j = 0; j < theta[i].length; j++) {
-                DoubleMatrix thetaG = new DoubleMatrix(cr.tGrad[i][j].rows, cr.tGrad[i][j].columns);
+                DoubleMatrix thetaG = new DoubleMatrix(gradients.tGrad[i][j].rows, gradients.tGrad[i][j].columns);
                 for(int k = 0; k < theta[i][j].length; k++) {
                     theta[i][j].put(k, theta[i][j].get(k)+epsilon);
-                    CostResult costPlus = cnn.computeCost(in, labels);
+                    Gradients gradientsPlus = cnn.computeCost(in, labels);
                     theta[i][j].put(k, theta[i][j].get(k)-2*epsilon);
-                    CostResult costMinus = cnn.computeCost(in, labels);
+                    Gradients gradientsMinus = cnn.computeCost(in, labels);
                     theta[i][j].put(k, theta[i][j].get(k)+epsilon);
-                    thetaG.put(k, (costPlus.cost-costMinus.cost)/(2*epsilon));
+                    thetaG.put(k, (gradientsPlus.cost- gradientsMinus.cost)/(2*epsilon));
                 }
-                DoubleMatrix thetaA = thetaG.add(cr.tGrad[i][j]);
-                DoubleMatrix thetaS = thetaG.sub(cr.tGrad[i][j]);
+                DoubleMatrix thetaA = thetaG.add(gradients.tGrad[i][j]);
+                DoubleMatrix thetaS = thetaG.sub(gradients.tGrad[i][j]);
                 System.out.println("CL Theta "+i+"/"+theta.length+":"+j+"/"+theta[i].length+" Diff: "+thetaS.norm2()/thetaA.norm2());
             }
         }
 
         a += epsilon;
-        CostResult costP = cnn.computeCost(in, labels);
+        Gradients gradientsP = cnn.computeCost(in, labels);
         a -= 2*epsilon;
-        CostResult costM = cnn.computeCost(in, labels);
+        Gradients gradientsM = cnn.computeCost(in, labels);
         a += epsilon;
-        double aG = (costP.cost-costM.cost)/(2*epsilon);
-        System.out.println("CL a: "+Math.abs((cr.aGrad-aG)/(cr.aGrad+aG)));
-        return cr.delt;
+        double aG = (gradientsP.cost- gradientsM.cost)/(2*epsilon);
+        System.out.println("CL a: "+Math.abs((gradients.aGrad-aG)/(gradients.aGrad+aG)));
+        return gradients.delt;
     }
 
-    public CostResult cost(final DoubleMatrix[][] input, final DoubleMatrix[][] output, final DoubleMatrix delta[][]) {
+    /**
+     * cost - computes the gradients of the layer
+     *
+     * Parameters:
+     * @param input input to the layer
+     * @param output output of the layer given input
+     * @param delta gradient propagated to this layer
+     *
+     * Return:
+     * @return The gradients of the layer
+     */
+    public Gradients cost(final DoubleMatrix[][] input, final DoubleMatrix[][] output, final DoubleMatrix delta[][]) {
         final DoubleMatrix[][] delt = new DoubleMatrix[input.length][theta[0].length];
         final DoubleMatrix[][] thetaGrad = new DoubleMatrix[theta.length][theta[0].length];
-        //System.out.println(delta[0][0]);
+        double aGrad = Utils.aGrad(costFunction, z, delta);
         for(int image = 0; image < input.length; image++) {
             for (int channel = 0; channel < theta[0].length; channel++) {
                 delt[image][channel] = new DoubleMatrix(input[0][0].rows, input[0][0].columns);
@@ -137,7 +247,7 @@ public class ConvolutionLayer extends ConvPoolLayer {
         }
         for(int feature = 0; feature < theta.length; feature++) {
             for (int channel = 0; channel < theta[0].length; channel++) {
-                thetaGrad[feature][channel] = new DoubleMatrix(patchDim, patchDim);
+                thetaGrad[feature][channel] = new DoubleMatrix(featureDim, featureDim);
             }
         }
         class ConvolutionThread implements Runnable {
@@ -150,7 +260,7 @@ public class ConvolutionLayer extends ConvPoolLayer {
             @Override
             public void run() {
                 for(int feature = 0; feature < theta.length; feature++) {
-                    delta[imageNum][feature].muli(Utils.activationGradient(layer1, output[imageNum][feature], a));
+                    delta[imageNum][feature].muli(Utils.activationGradient(costFunction, output[imageNum][feature], a));
                     for(int channel = 0; channel < theta[feature].length; channel++) {
                         delt[imageNum][channel].addi(Utils.conv2d(delta[imageNum][feature], Utils.reverseMatrix(theta[feature][channel]), false));
                         thetaGrad[feature][channel].addi(Utils.conv2d(input[imageNum][channel], delta[imageNum][feature], true).div(input.length));
@@ -165,6 +275,11 @@ public class ConvolutionLayer extends ConvPoolLayer {
         }
         executor.shutdown();
         while(!executor.isTerminated());
+        for(int i = 0; i < thetaGrad.length; i++) {
+            for(int j = 0; j < thetaGrad[i].length; j++) {
+                thetaGrad[i][j].addi(theta[i][j].mul(lambda));
+            }
+        }
         DoubleMatrix bGrad = new DoubleMatrix(bias.length);
         for(int i = 0; i < theta.length; i++) {
             double deltMean = 0;
@@ -174,82 +289,58 @@ public class ConvolutionLayer extends ConvPoolLayer {
             bGrad.put(i, deltMean / input.length);
         }
         //System.out.println(delta[0][0]);
-        double aGrad = Utils.aGrad(layer1, output, delta, a);
-        return new CostResult(0, thetaGrad, bGrad, delt, aGrad);
+
+        return new Gradients(0, thetaGrad, bGrad, delt, aGrad);
     }
 
-    public DoubleMatrix[][] backPropagation(CostResult cr, double momentum, double alpha) {
-        biasVelocity.muli(momentum).addi(cr.biasGrad.mul(alpha));
+    /**
+     * backpropagation - updates weights of layer based on backpropagated gradients
+     *
+     * Parameters:
+     * @param gradients The gradients of the layer
+     * @param momentum The momentum to update the weights with
+     * @param alpha The learning rate
+     *
+     * Return:
+     * @return gradient propagated through the layer
+     */
+    public DoubleMatrix[][] backpropagation(Gradients gradients, double momentum, double alpha) {
+        biasVelocity.muli(momentum).addi(gradients.biasGrad.mul(alpha));
         bias.subi(biasVelocity);
         for(int i = 0; i < theta.length; i++) {
             for(int j = 0; j < theta[i].length; j++) {
-                thetaVelocity[i][j].muli(momentum).addi(cr.tGrad[i][j].mul(alpha));
+                thetaVelocity[i][j].muli(momentum).addi(gradients.tGrad[i][j].mul(alpha));
                 theta[i][j].subi(thetaVelocity[i][j]);
             }
         }
-        aVelocity = aVelocity * momentum + cr.aGrad * alpha;
-        a -= aVelocity;//cr.aGrad * alpha;
-        //System.out.println("CL A: "+a);
-        return cr.delt;
+        aVelocity = aVelocity * momentum + gradients.aGrad * alpha;
+        a -= aVelocity;
+        return gradients.delt;
     }
 
     public double getA() {
         return a;
     }
 
-    public void writeLayer(String filename) {
-        /*try {
-            FileWriter fw = new FileWriter(filename);
-            BufferedWriter writer = new BufferedWriter(fw);
-            writer.write(theta.length+","+theta.columns+"\n");
-            for(int i = 0; i < theta.rows; i++) {
-                for(int j = 0; j < theta.columns; j++) {
-                    writer.write(theta.get(i,j)+",");
+    /**
+     * writeLayer - writes the weights of layer to a buffer.
+     *
+     * Parameters:
+     * @param writer the buffer to write to
+     */
+    public void writeLayer(BufferedWriter writer) {
+        try {
+            writer.write(Utils.CONVLAYER+"\n");
+            writer.write(costFunction+","+a+","+theta.length+","+theta[0].length+"\n");
+            for(int i = 0; i < theta.length; i++) {
+                for(int j = 0; j < theta[i].length; j++) {
+                    Utils.printMatrix(theta[i][j], writer);
                 }
             }
-            writer.write("\n"+bias.rows+","+bias.columns+"\n");
-            for(int i = 0; i < bias.rows; i++) {
-                for(int j = 0; j < bias.columns; j++) {
-                    writer.write(bias.get(i,j)+",");
-                }
-            }
-            writer.write("\n"+imageRows+"\n"+imageCols+"\n"+patchDim+"\n"+poolDim);
-            writer.close();
+            Utils.printMatrix(bias, writer);
         }
         catch(IOException e) {
             e.printStackTrace();
-        }*/
-    }
-
-    public void loadLayer(String filename) {
-        /*try {
-            FileReader fr = new FileReader(filename);
-            @SuppressWarnings("resource")
-            BufferedReader reader = new BufferedReader(fr);
-            String[] line = reader.readLine().split(",");
-            theta = new DoubleMatrix(Integer.parseInt(line[0]), Integer.parseInt(line[1]));
-            line = reader.readLine().split(",");
-            for(int i = 0; i < theta.rows; i++) {
-                for(int j = 0; j < theta.columns; j++) {
-                    theta.put(i, j, Double.parseDouble(line[i * theta.columns + j]));
-                }
-            }
-            line = reader.readLine().split(",");
-            bias = new DoubleMatrix(Integer.parseInt(line[0]), Integer.parseInt(line[1]));
-            line = reader.readLine().split(",");
-            for(int i = 0; i < bias.rows; i++) {
-                for(int j = 0; j < bias.columns; j++) {
-                    bias.put(i, j, Double.parseDouble(line[i * bias.columns + j]));
-                }
-            }
-            imageRows = Integer.parseInt(reader.readLine());
-            imageCols = Integer.parseInt(reader.readLine());
-            patchDim = Integer.parseInt(reader.readLine());
-            poolDim = Integer.parseInt(reader.readLine());
-            reader.close();
         }
-        catch(IOException e) {
-            e.printStackTrace();
-        }*/
     }
 }

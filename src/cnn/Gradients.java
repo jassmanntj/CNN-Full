@@ -2,7 +2,7 @@ package cnn;
 
 import org.jblas.DoubleMatrix;
 
-public class CostResult {
+public class Gradients {
 	public double cost;
 	public DoubleMatrix delta;
 	public DoubleMatrix thetaGrad;
@@ -11,14 +11,14 @@ public class CostResult {
     public DoubleMatrix[][] tGrad;
     public double aGrad;
 	
-	public CostResult(double cost, DoubleMatrix thetaGrad, DoubleMatrix biasGrad, DoubleMatrix delta) {
+	public Gradients(double cost, DoubleMatrix thetaGrad, DoubleMatrix biasGrad, DoubleMatrix delta) {
 		this.cost = cost;
 		this.thetaGrad = thetaGrad;
 		this.biasGrad = biasGrad;
 		this.delta = delta;
 	}
 
-    public CostResult(double cost, DoubleMatrix thetaGrad, DoubleMatrix biasGrad, DoubleMatrix delta, double aGrad) {
+    public Gradients(double cost, DoubleMatrix thetaGrad, DoubleMatrix biasGrad, DoubleMatrix delta, double aGrad) {
         this.cost = cost;
         this.thetaGrad = thetaGrad;
         this.biasGrad = biasGrad;
@@ -26,7 +26,7 @@ public class CostResult {
         this.aGrad = aGrad;
     }
 
-    public CostResult(double cost, DoubleMatrix[][] tGrad, DoubleMatrix bGrad, DoubleMatrix[][] delt, double aGrad) {
+    public Gradients(double cost, DoubleMatrix[][] tGrad, DoubleMatrix bGrad, DoubleMatrix[][] delt, double aGrad) {
         this.cost = cost;
         this.tGrad = tGrad;
         this.biasGrad = bGrad;

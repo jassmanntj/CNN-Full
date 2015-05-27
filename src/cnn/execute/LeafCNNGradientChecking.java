@@ -15,8 +15,8 @@ public class LeafCNNGradientChecking {
     public void run() throws Exception {
         DoubleMatrix[][] images;
         DoubleMatrix labels;
-        int patchDim = 3;
-        int poolDim = 2;
+        int patchDim = 5;
+        int poolDim = 1;
         int numFeatures = 3;
         //int hiddenSize = 200;
         int imageRows = 16;
@@ -29,39 +29,44 @@ public class LeafCNNGradientChecking {
         int hiddenSize = 150;
         int batchSize = 30;
         double momentum = 0;
+        double dropout = 0;
 
         String resFile = "Testing";
-        images = new DoubleMatrix[2][channels];
+        images = new DoubleMatrix[3][channels];
         for(int i = 0; i < channels; i++) {
             images[0][i] = DoubleMatrix.rand(imageRows, imageColumns);
         }
         for(int i = 0; i < channels; i++) {
             images[1][i] = DoubleMatrix.rand(imageRows, imageColumns);
         }
-        labels = new DoubleMatrix(2,2);
+        for(int i = 0; i < channels; i++) {
+            images[2][i] = DoubleMatrix.rand(imageRows, imageColumns);
+        }
+        labels = new DoubleMatrix(3,2);
         labels.put(0,0,1);
         labels.put(1,1,1);
+        labels.put(2,1,1);
         //ImageLoader loader = new ImageLoader();
         //File folder = new File("C:\\Users\\Tim\\Desktop\\CA-Leaves2");
         //HashMap<String, Double> labelMap = loader.getLabelMap(folder);
         //loader.loadFolder(folder, channels, imageColumns, imageRows, labelMap);
         //images = loader.getImgArr();
         //labels = loader.getLabels();
-        int cl = 1;
+        int cl = 2;
 
-        ConvolutionLayer cl1 = new ConvolutionLayer(numFeatures, channels, patchDim);
-        ConvolutionLayer cl2 = new ConvolutionLayer(numFeatures, numFeatures, patchDim);
-        PoolingLayer cl3 = new PoolingLayer(poolDim);
+        ConvolutionLayer cl1 = new ConvolutionLayer(numFeatures, channels, patchDim, lambda, dropout, Utils.PRELU);
+        ConvolutionLayer cl2 = new ConvolutionLayer(numFeatures, numFeatures, patchDim, lambda, dropout, Utils.PRELU);
+        PoolingLayer cl3 = new PoolingLayer(poolDim, PoolingLayer.MEAN);
 
-        SparseAutoencoder sa = new SparseAutoencoder(numFeatures * ((imageRows-cl*patchDim+cl)/poolDim) * ((imageColumns - cl*patchDim+cl)/poolDim), hiddenSize, sparsityParam, lambda, beta, alpha);
-        //SparseAutoencoder sa2 = new SparseAutoencoder(hiddenSize, hiddenSize, sparsityParam, lambda, beta, alpha);
+        FCLayer sa = new FCLayer(numFeatures * ((imageRows-cl*patchDim+cl)/poolDim) * ((imageColumns - cl*patchDim+cl)/poolDim), hiddenSize, lambda, dropout, Utils.PRELU);
+        FCLayer sa2 = new FCLayer(hiddenSize, hiddenSize, lambda, dropout, Utils.PRELU);
 
         SoftmaxClassifier sc = new SoftmaxClassifier(1e-4, hiddenSize, labels.columns);
-        SparseAutoencoder[] saes = {sa};
-        ConvPoolLayer[] cls = {cl1, cl3};
+        FCLayer[] saes = {sa, sa2};
+        ConvPoolLayer[] cls = {cl1, cl2};
         NeuralNetwork cnn = new NeuralNetwork(cls, saes, sc, resFile);
         while(true) {
-            cnn.train(images, labels, images, labels, 1, 1, momentum, alpha);
+            cnn.train(images, labels, images, labels, 1, 2, momentum, alpha, 1);
             cnn.gradientCheck(images, labels);
         }
     }

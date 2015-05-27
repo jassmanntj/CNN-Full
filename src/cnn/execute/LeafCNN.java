@@ -20,19 +20,20 @@ public class LeafCNN {
         DoubleMatrix labels;
         int patchDim = 3;
         int poolDim = 2;
-        int numFeatures = 25;
+        int numFeatures = 16;
         //int hiddenSize = 200;
         int imageRows = 80;
         int imageColumns = 60;
-        double sparsityParam = 0.035;
-        double lambda = 3e-3;
-        double beta = 5;
-        double alpha =  1e-4;
+        double lambda = 5e-5;
+        double alpha =  1e-3;
         int channels = 3;
         int hiddenSize = 200;
-        int batchSize = 42;
-        double momentum = 0;
-        int iterations = 10000;
+        int hiddenSize2 = 200;
+        int batchSizeLoad = 45;//42
+        int batchSize = 45;
+        double momentum = 0.9;
+        int iterations = 70;
+        double dropout = 0.5;
 
         String resFile = "Testing";
 
@@ -40,22 +41,26 @@ public class LeafCNN {
         File folder = new File("C:\\Users\\jassmanntj\\Desktop\\CA-Leaves2");
         HashMap<String, Double> labelMap = loader.getLabelMap(folder);
         loader.loadFolder(folder, channels, imageColumns, imageRows, labelMap);
-        images = loader.getImgArr(0, batchSize);
-        labels = loader.getLabels(0, batchSize);
-        DoubleMatrix[][] testImages = loader.getTestArr(0, batchSize);
-        DoubleMatrix testLabels = loader.getTestLabels(0, batchSize);
-        ConvolutionLayer cl1 = new ConvolutionLayer(numFeatures, channels, patchDim);
-        //ConvolutionLayer cl2 = new ConvolutionLayer(numFeatures, numFeatures, patchDim);
-        //cl1.pretrain(images, numFeatures, 10);
-        PoolingLayer cl3 = new PoolingLayer(poolDim);
 
-        SparseAutoencoder sa = new SparseAutoencoder(numFeatures * ((imageRows-patchDim+1)/poolDim) * ((imageColumns - patchDim+1)/poolDim), hiddenSize, sparsityParam, lambda, beta, alpha);
-        SparseAutoencoder sa2 = new SparseAutoencoder(hiddenSize, 100, sparsityParam, lambda, beta, alpha);
+        for(int i = 0; i < 10; i++) {
+            images = loader.getImgArr(i, false, false, batchSizeLoad);
+            labels = loader.getLabels(i, false, false, batchSizeLoad);
+            DoubleMatrix[][] testImages = loader.getTestArr(i, false, false, batchSizeLoad);
+            DoubleMatrix testLabels = loader.getTestLabels(i, false, false, batchSizeLoad);
+            int convLayers = 1;
+            ConvPoolLayer[] cls = new ConvPoolLayer[convLayers+1];
+            cls[0] = new ConvolutionLayer(numFeatures, channels, patchDim, lambda, dropout, Utils.PRELU);
+            //cls[1] = new ConvolutionLayer(numFeatures, numFeatures, patchDim, lambda, dropout);
+            //cl1.pretrain(images, numFeatures, 10);
+            cls[1] = new PoolingLayer(poolDim, PoolingLayer.MAX);
 
-        SoftmaxClassifier sc = new SoftmaxClassifier(1e-4, hiddenSize, labels.columns);
-        SparseAutoencoder[] saes = {sa};
-        ConvPoolLayer[] cls = {cl1, cl3};
-        NeuralNetwork cnn = new NeuralNetwork(cls, saes, sc, resFile);
-        cnn.train(images, labels, testImages, testLabels, iterations, batchSize, momentum, alpha);
+            FCLayer sa = new FCLayer(numFeatures * ((imageRows - convLayers*patchDim + convLayers) / poolDim) * ((imageColumns - convLayers*patchDim + convLayers) / poolDim), hiddenSize, lambda, dropout, Utils.PRELU);
+            //FCLayer sa2 = new FCLayer(hiddenSize, hiddenSize, lambda, dropout, Utils.PRELU);
+
+            SoftmaxClassifier sc = new SoftmaxClassifier(lambda, hiddenSize, labels.columns);
+            FCLayer[] saes = {sa}; //{sa, sa2};
+            NeuralNetwork cnn = new NeuralNetwork(cls, saes, sc, "TestNNs"+i);
+            cnn.train(images, labels, testImages, testLabels, iterations, batchSize, momentum, alpha, i);
+        }
     }
 }

@@ -1,8 +1,11 @@
 package cnn;
 
 import java.awt.image.BufferedImage;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import javax.imageio.ImageIO;
 
@@ -18,8 +21,11 @@ public class Utils {
     public static final int SIGMOID = 1;
     public static final int PRELU = 2;
     public static final int RELU = 3;
+    public static final int SOFTMAX = 4;
+    public static final int CONVLAYER = 0;
+    public static final int POOLLAYER = 1;
 
-	public static DoubleMatrix ZCAWhiten(DoubleMatrix input, double epsilon) {
+	/*public static DoubleMatrix ZCAWhiten(DoubleMatrix input, double epsilon) {
         input.subiColumnVector(input.rowMeans());
         DoubleMatrix sigma = DoubleMatrix.diag(DoubleMatrix.diag(input.transpose().mmul(input)));
 		sigma.divi(input.rows);
@@ -31,7 +37,34 @@ public class Utils {
 		ZCAWhite = DoubleMatrix.diag(ZCAWhite);
 		ZCAWhite = svd[0].mmul(ZCAWhite).mmul(svd[0].transpose());
 		return ZCAWhite.mmul(input);
-	}
+	}*/
+
+    public static DoubleMatrix[][] ZCAWhiten(DoubleMatrix[][] input, double epsilon) {
+        DoubleMatrix img = flatten(input);
+        DoubleMatrix mean = img.rowMeans();
+        img.subiColumnVector(mean);
+        DoubleMatrix sigma = img.mul(img).rowMeans();
+        sigma = DoubleMatrix.diag(sigma);
+        DoubleMatrix[] svd = Singular.fullSVD(sigma);
+        DoubleMatrix s = DoubleMatrix.diag(MatrixFunctions.sqrt(svd[1].add(epsilon)).rdiv(1));
+        DoubleMatrix res = svd[0].mmul(s).mmul(svd[0].transpose()).mmul(img);
+        return expand(res, input[0].length, input[0][0].rows, input[0][0].columns);
+    }
+
+    public static DoubleMatrix[][] expand(DoubleMatrix in, int channels, int rows, int cols) {
+        DoubleMatrix[][] result = new DoubleMatrix[in.rows][channels];
+        for(int i = 0; i < in.rows; i++) {
+            for(int j = 0; j < channels; j++) {
+                result[i][j] = new DoubleMatrix(rows, cols);
+                for(int k = 0; k < rows; k++) {
+                    for(int l = 0; l < cols; l++) {
+                        result[i][j].put(k, l, in.get(i, j * rows * cols + k * cols + l));
+                    }
+                }
+            }
+        }
+        return result;
+    }
 
 	public static DoubleMatrix conv2d(DoubleMatrix input, DoubleMatrix kernel, boolean valid) {
 		int inputRows = input.rows;
@@ -63,30 +96,35 @@ public class Utils {
             return result;
         }
 	}
-    public static void print(DoubleMatrix d) {
-        for(int i = 0; i < d.rows; i++) {
-            System.out.println(d.getRow(i));
-        }
-        System.out.println("--------------");
-    }
-
-    public static void print(ComplexDoubleMatrix d) {
-        for(int i = 0; i < d.rows; i++) {
-            System.out.println(d.getRow(i));
-        }
-        System.out.println("--------------");
-    }
 	
 	public static DoubleMatrix reverseMatrix(DoubleMatrix mat) {
-		mat = mat.dup();
-		for(int i = 0; i < mat.rows/2; i++) {
-			mat.swapRows(i, mat.rows-i-1);
-		}
-		for(int i = 0; i < mat.columns/2; i++) {
-			mat.swapColumns(i, mat.columns-i-1);
-		}
-		return mat;
+		mat = flipHorizontal(mat);
+		return flipVerticali(mat);
 	}
+
+    public static DoubleMatrix flipHorizontal(DoubleMatrix mat) {
+        mat = mat.dup();
+        return flipHorizontali(mat);
+    }
+
+    public static DoubleMatrix flipVertical(DoubleMatrix mat) {
+        mat = mat.dup();
+        return flipVerticali(mat);
+    }
+
+    public static DoubleMatrix flipHorizontali(DoubleMatrix mat) {
+        for(int i = 0; i < mat.rows/2; i++) {
+            mat.swapRows(i, mat.rows-i-1);
+        }
+        return mat;
+    }
+
+    public static DoubleMatrix flipVerticali(DoubleMatrix mat) {
+        for(int i = 0; i < mat.columns/2; i++) {
+            mat.swapColumns(i, mat.columns-i-1);
+        }
+        return mat;
+    }
 	
 	public static void visualizeColor(int width, int height, int images, DoubleMatrix img, String filename) throws IOException {
 		BufferedImage image = new BufferedImage(width*images+images*2+2, height*images+images*2+2, BufferedImage.TYPE_INT_RGB);
@@ -140,6 +178,32 @@ public class Utils {
 		File imageFile = new File(filename);
 		ImageIO.write(image, "png", imageFile);
 	}
+
+    public static void visualizeColorImg(DoubleMatrix[] img, String filename) throws IOException {
+        int width = img[0].columns;
+        int height = img[0].rows;
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        double min = 255;
+        double max = -255;
+        for(int i = 0; i < img.length; i++) {
+            min = img[i].min() < min ? img[i].min():min;
+            max = img[i].max() > max ? img[i].max():max;
+        }
+        max = max - min;
+        for(int i = 0; i < img.length; i++) {
+            img[i].subi(min);
+            img[i].divi(max);
+            img[i].muli(255);
+        }
+        for(int i = 0; i < height; i++) {
+            for(int j = 0; j < width; j++) {
+                int col = ((int)img[0].get(i,j) << 16) | ((int)img[1].get(i,j) << 8) | (int)img[2].get(i,j);
+                image.setRGB(j,i, col);
+            }
+        }
+        File imageFile = new File(filename+".png");
+        ImageIO.write(image, "png", imageFile);
+    }
 	
 	public static DoubleMatrix sigmoid(DoubleMatrix z) {
 		return MatrixFunctions.exp(z.neg()).add(1).rdiv(1);
@@ -162,7 +226,6 @@ public class Utils {
                         }
                         current[k] = result.get(i,j);
                         results[i][k] = j;
-                        int a = 5;
                         break;
                     }
                 }
@@ -187,15 +250,14 @@ public class Utils {
         return images;
     }
 
-    public static double aGrad(int type, DoubleMatrix result, DoubleMatrix delta, double a) {
+    public static double aGrad(int type, DoubleMatrix result, DoubleMatrix delta) {
         double aGrad = 0;
         switch(type) {
             case PRELU:
                 for(int i = 0; i < result.length; i++) {
                     if( result.get(i) <= 0) aGrad += result.get(i)*delta.get(i);
                 }
-                return aGrad/(a*a*2); // wtf???
-                //return result.le(0).mul(result).mul(delta).sum();
+                return aGrad/result.rows;
             case SIGMOID: return 0;
             case RELU: return 0;
             case NONE: return 0;
@@ -203,7 +265,63 @@ public class Utils {
         }
     }
 
-    public static double aGrad(int type, DoubleMatrix[][] result, DoubleMatrix[][] delta, double a) {
+    public static void printMatrix(DoubleMatrix mat, BufferedWriter writer) throws IOException {
+        for(int i = 0; i < mat.rows; i++) {
+            for(int j = 0; j < mat.columns; j++) {
+                writer.write(mat.get(i,j)+" ");
+            }
+            writer.write("\n");
+        }
+        writer.write("\n");
+    }
+
+    public static void alter(DoubleMatrix[][] images) {
+        class AlterThread implements Runnable {
+            private DoubleMatrix[] image;
+
+            public AlterThread(DoubleMatrix[] image) {
+                this.image = image;
+            }
+
+            @Override
+            public void run() {
+                DoubleMatrix a = DoubleMatrix.randn(image.length).mul(0.1);
+                DoubleMatrix i = new DoubleMatrix(image.length, image[0].length);
+                for(int k = 0; k < image.length; k++) {
+                    for (int j = 0; j < image[0].length; j++) {
+                        i.put(k, j, image[k].get(j));
+                    }
+                }
+                i.subiColumnVector(i.rowMeans());
+                i = i.mmul(i.transpose()).div(i.columns);
+                DoubleMatrix[] svd = Singular.fullSVD(i);
+                svd[1].muli(a);
+                DoubleMatrix res = svd[0].mmul(svd[1]);
+                for(int j = 0; j < image.length; j++) {
+                    image[j].addi(res.get(j));
+                }
+                if(Math.random() > 0.5) {
+                    for (int j = 0; j < image.length; j++) {
+                        image[j] = Utils.flipHorizontal(image[j]);
+                    }
+                }
+                if(Math.random() > 0.5) {
+                    for (int j = 0; j < image.length; j++) {
+                        image[j] = Utils.flipVertical(image[j]);
+                    }
+                }
+            }
+        }
+        ExecutorService executor = Executors.newFixedThreadPool(Utils.NUMTHREADS);
+        for(DoubleMatrix[] image : images) {
+            Runnable worker = new AlterThread(image);
+            executor.execute(worker);
+        }
+        executor.shutdown();
+        while(!executor.isTerminated());
+    }
+
+    public static double aGrad(int type, DoubleMatrix[][] result, DoubleMatrix[][] delta) {
         double aGrad = 0;
         switch(type) {
             case PRELU:
@@ -214,7 +332,7 @@ public class Utils {
                         }
                     }
                 }
-                return aGrad/(a*a*2); // wtf???
+                return aGrad/result.length;
             case SIGMOID:
             case RELU:
             case NONE:
@@ -230,11 +348,20 @@ public class Utils {
                 return prelu(z, a);
             case RELU:
                 return relu(z);
+            case SOFTMAX:
+                return softmax(z);
             case NONE:
                 return z;
             default:
                 return sigmoid(z);
         }
+    }
+
+    private static DoubleMatrix softmax(DoubleMatrix z) {
+        DoubleMatrix p = z.subColumnVector(z.rowMaxs());
+        MatrixFunctions.expi(p);
+        p.diviColumnVector(p.rowSums());
+        return p;
     }
 
     public static DoubleMatrix activationGradient(int type, DoubleMatrix z, double a) {
