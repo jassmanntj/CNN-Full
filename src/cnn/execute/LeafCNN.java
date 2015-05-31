@@ -50,8 +50,8 @@ public class LeafCNN {
             DoubleMatrix testLabels = loader.getTestLabels(i, false, false, batchSizeLoad);
             int convLayers = 2;
             ConvPoolLayer[] cls = new ConvPoolLayer[convLayers*2];
-            cls[0] = new ConvolutionLayer(numFeatures, channels, patchDim, lambda, 0, Utils.PRELU);
-            cls[2] = new ConvolutionLayer(numFeatures, numFeatures, patchDim2, lambda, 0, Utils.PRELU);
+            cls[0] = new ConvolutionLayer(numFeatures, channels, patchDim, lambda, dropout, Utils.PRELU);
+            cls[2] = new ConvolutionLayer(numFeatures, numFeatures, patchDim2, lambda, dropout, Utils.PRELU);
             //cl1.pretrain(images, numFeatures, 10);
             cls[1] = new PoolingLayer(poolDim, PoolingLayer.MAX);
             cls[3] = new PoolingLayer(poolDim, PoolingLayer.MAX);
@@ -61,7 +61,7 @@ public class LeafCNN {
 
             SoftmaxClassifier sc = new SoftmaxClassifier(lambda, hiddenSize, labels.columns);
             FCLayer[] saes = {sa}; //{sa, sa2};
-            NeuralNetwork cnn = new NeuralNetwork(cls, saes, sc, "TestNNs"+i);
+            NeuralNetwork cnn = new NeuralNetwork(cls, saes, sc, "TestNNd"+i);
             cnn.train(images, labels, testImages, testLabels, iterations, batchSize, momentum, alpha, i);
             compareClasses(Utils.computeResults(cnn.compute(testImages, batchSize)), testLabels, labelMap);
         }

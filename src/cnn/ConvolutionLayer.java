@@ -351,7 +351,7 @@ public class ConvolutionLayer extends ConvPoolLayer {
         Matrix b = new Matrix(bias.toArray2());
         Matrix[][] t = new Matrix[theta.length][theta[0].length];
         for(int i = 0; i < theta.length; i++) {
-            for(int j = 0; j < theta.length; j++) {
+            for(int j = 0; j < theta[i].length; j++) {
                 t[i][j] = new Matrix(theta[i][j].toArray2());
             }
         }
