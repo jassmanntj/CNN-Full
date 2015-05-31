@@ -1,5 +1,6 @@
 package cnn;
 
+import cnn.mobile.DeviceConvPoolLayer;
 import org.jblas.DoubleMatrix;
 
 import java.io.BufferedWriter;
@@ -23,4 +24,5 @@ public abstract class ConvPoolLayer {
     protected DoubleMatrix[][] feedForward(DoubleMatrix[][] in) {
         return compute(in);
     };
+    public abstract DeviceConvPoolLayer getDevice();
 }

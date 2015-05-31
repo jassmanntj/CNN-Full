@@ -1,10 +1,12 @@
 package cnn;
 
+import cnn.mobile.DeviceConvPoolLayer;
+import cnn.mobile.DeviceFCLayer;
+import cnn.mobile.DeviceNeuralNetwork;
 import org.jblas.DoubleMatrix;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.util.HashMap;
 import java.util.Random;
 
 /**
@@ -17,6 +19,7 @@ public class NeuralNetwork {
     private String name;
     private Random r;
     private double cost;
+    private double previousCost;
     private static final boolean DEBUG = false;
 
     public NeuralNetwork(ConvPoolLayer[] cls, FCLayer[] lds, SoftmaxClassifier sc, String name) {
@@ -34,7 +37,7 @@ public class NeuralNetwork {
             indices[i] = i;
         }
         for(int i = 0; i < iterations; i++) {
-            if( i%10==9) alpha /=2;
+            previousCost = cost;
             System.out.println("Alpha: "+alpha);
             shuffleIndices(indices, indices.length);
             boolean br = false;
@@ -87,6 +90,7 @@ public class NeuralNetwork {
 
             System.out.println("Train");
             DoubleMatrix res = compute(input, batchSize, labels);
+            if(cost > previousCost) alpha *= 0.75;
             boolean finished = compareResults(Utils.computeResults(res), labels);
             System.out.println("Test");
             DoubleMatrix testRes = compute(test, testLab);
@@ -101,6 +105,7 @@ public class NeuralNetwork {
         }
         write(name);
     }
+
 
     public boolean compareResults(int[][] result, DoubleMatrix labels) {
         double[] sums = new double[result[0].length];
@@ -228,9 +233,28 @@ public class NeuralNetwork {
 
     public void write(String filename) {
         try {
+            ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(filename));
+            DeviceConvPoolLayer[] cp = new DeviceConvPoolLayer[cls.length];
+            DeviceFCLayer[] fc = new DeviceFCLayer[lds.length];
+            for(int i = 0; i < cls.length; i++) {
+                cp[i] = cls[i].getDevice();
+            }
+            for(int i = 0; i < lds.length; i++) {
+                fc[i] = lds[i].getDevice();
+            }
+
+            DeviceNeuralNetwork nn = new DeviceNeuralNetwork(cp, fc);
+            out.writeObject(nn);
+
+
+
+
+
+
+
             FileWriter fw = new FileWriter(filename);
             BufferedWriter writer = new BufferedWriter(fw);
-            writer.write(cls.length+","+(lds.length));
+            writer.write(cls.length+","+(lds.length+1)+"\n");
             for (int i = 0; i < cls.length; i++) {
                 cls[i].writeLayer(writer);
             }

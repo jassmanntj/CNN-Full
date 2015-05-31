@@ -54,30 +54,16 @@ public class ImageLoader {
             images[i] = new DoubleMatrix(counts[i], channels * width * height);
             labels[i] = new DoubleMatrix(counts[i], labelMap.size());
         }
-        int[] indices = new int[total];
-        for(int i = 0; i < indices.length; i++) {
-            indices[i] = i;
-        }
-        Random r = new Random(System.currentTimeMillis());
-        for(int i = 0; i < 2*total; i++) {
-            int a = r.nextInt(indices.length);
-            int b = r.nextInt(indices.length);
-            int temp = indices[a];
-            indices[a] = indices[b];
-            indices[b] = temp;
-        }
-        DoubleMatrix imageNo = new DoubleMatrix(counts[0]);
-        for(int i = 0; i < imageNo.length; i++) {
-            imageNo.put(i, i);
-        }
 
         ExecutorService executor = Executors.newFixedThreadPool(Utils.NUMTHREADS);
         for(File leaf : folder.listFiles()) {
             int i = 0;
             if(leaf.isDirectory() && labelMap.containsKey(leaf.getName())) {
                 for(File image : leaf.listFiles()) {
-                    Runnable ip = new ImageProcessor(image, i, labelMap.get(leaf.getName()), imageNo, indices[z++]);
+                    Runnable ip = new ImageProcessor(image, i, labelMap.get(leaf.getName()), z);
                     executor.execute(ip);
+                    z += 30;
+                    z = z%450 + z/450;
                     i++;
                 }
             }
@@ -90,12 +76,10 @@ public class ImageLoader {
         private File image;
         private double leafNo;
         private int num;
-        private int imgNo;
         private int z;
-        public ImageProcessor(File image, int num, double leafNo, DoubleMatrix imageNo, int z) {
+        public ImageProcessor(File image, int num, double leafNo, int z) {
             this.image = image;
             this.num = num;
-            this.imgNo = num;
             this.z = z;
             this.leafNo = leafNo;
         }

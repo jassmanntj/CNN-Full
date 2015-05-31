@@ -1,5 +1,7 @@
 package cnn;
 
+import cnn.mobile.DeviceConvPoolLayer;
+import cnn.mobile.DevicePoolingLayer;
 import org.jblas.DoubleMatrix;
 
 import java.io.BufferedWriter;
@@ -141,5 +143,9 @@ public class PoolingLayer extends ConvPoolLayer {
         catch(IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public DeviceConvPoolLayer getDevice() {
+        return new DevicePoolingLayer(poolDim, type);
     }
 }

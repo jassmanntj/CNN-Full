@@ -1,5 +1,8 @@
 package cnn;
 
+import Jama.Matrix;
+import cnn.mobile.DeviceConvPoolLayer;
+import cnn.mobile.DeviceConvolutionLayer;
 import org.jblas.DoubleMatrix;
 
 import java.io.*;
@@ -83,7 +86,7 @@ public class ConvolutionLayer extends ConvPoolLayer {
      * @return initialized values for theta
      */
     private DoubleMatrix initializeTheta(int featureDim, int channels) {
-        double stdev = Math.sqrt(2.0/((1+a*a)*featureDim*featureDim*channels));
+        double stdev = Math.sqrt(2.0/((a*a+1)*featureDim*featureDim*channels));
         DoubleMatrix res = DoubleMatrix.randn(featureDim, featureDim);
         res.muli(stdev);
         return res;
@@ -156,8 +159,8 @@ public class ConvolutionLayer extends ConvPoolLayer {
                         res.addi(Utils.conv2d(input[imageNum][channel], theta[feature][channel], true));
                     }
                     DoubleMatrix drop = DoubleMatrix.rand(res.rows, res.columns).ge(dropout);
-                    z[imageNum][feature] = res.add(bias.get(feature));
-                    result[imageNum][feature] = Utils.activationFunction(costFunction, z[imageNum][feature], a).mul(drop);
+                    z[imageNum][feature] = res.add(bias.get(feature)).mul(drop);
+                    result[imageNum][feature] = Utils.activationFunction(costFunction, z[imageNum][feature], a);
                 }
             }
         }
@@ -342,5 +345,16 @@ public class ConvolutionLayer extends ConvPoolLayer {
         catch(IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public DeviceConvPoolLayer getDevice() {
+        Matrix b = new Matrix(bias.toArray2());
+        Matrix[][] t = new Matrix[theta.length][theta[0].length];
+        for(int i = 0; i < theta.length; i++) {
+            for(int j = 0; j < theta.length; j++) {
+                t[i][j] = new Matrix(theta[i][j].toArray2());
+            }
+        }
+        return new DeviceConvolutionLayer(t, b, costFunction, a);
     }
 }

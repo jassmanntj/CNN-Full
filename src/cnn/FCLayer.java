@@ -2,6 +2,9 @@ package cnn;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
+
+import Jama.Matrix;
+import cnn.mobile.DeviceFCLayer;
 import org.jblas.DoubleMatrix;
 
 /**
@@ -22,6 +25,7 @@ public class FCLayer {
     private double a;
     private double aVelocity;
     private double dropout;
+    private DoubleMatrix res;
 
     /**
      * FCLayer - constructor for FCLayer class
@@ -50,7 +54,7 @@ public class FCLayer {
      * initializeParams - initializes theta, bias, and a values.
      */
 	private void initializeParams() {
-        double stdev = Math.sqrt(2.0/((1+a*a)*inputSize));
+        double stdev = Math.sqrt(2.0/((a*a+1)*inputSize));
 		theta = DoubleMatrix.randn(inputSize, outputSize).muli(stdev);
 		thetaVelocity = new DoubleMatrix(inputSize, outputSize);
 		biasVelocity = new DoubleMatrix(1, outputSize);
@@ -115,7 +119,7 @@ public class FCLayer {
      * @return gradients of the layer
      */
 	public Gradients cost(DoubleMatrix input, DoubleMatrix output, DoubleMatrix delta) {
-        double aGrad = Utils.aGrad(activationFunction, input.mmul(theta).addRowVector(bias), delta);
+        double aGrad = Utils.aGrad(activationFunction, res, delta);
 		delta.muli(Utils.activationGradient(activationFunction, output, a)).muli(output.ne(0));
 		//delta2
 		DoubleMatrix delta2 = delta.mmul(theta.transpose());
@@ -176,8 +180,8 @@ public class FCLayer {
     public DoubleMatrix feedforward(DoubleMatrix input) {
         DoubleMatrix result = input.mmul(theta);
         result.addiRowVector(bias);
-        DoubleMatrix drop = DoubleMatrix.rand(result.rows, result.columns).ge(dropout);
-        return Utils.activationFunction(activationFunction, result, a).mul(drop);
+        res = result.mul(DoubleMatrix.rand(result.rows, result.columns).ge(dropout));
+        return Utils.activationFunction(activationFunction, res, a);
     }
 
     /*public DoubleMatrix[][] getThetaArr(int patchSize) {
@@ -207,5 +211,11 @@ public class FCLayer {
 			e.printStackTrace();
 		}
 	}
+
+    public DeviceFCLayer getDevice() {
+        Matrix t = new Matrix(theta.toArray2());
+        Matrix b = new Matrix(bias.toArray2());
+        return new DeviceFCLayer(activationFunction, a, t, b);
+    }
 }
 

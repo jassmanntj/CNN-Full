@@ -90,7 +90,7 @@ public class SoftmaxClassifier {
 	
 	public void writeLayer(BufferedWriter writer) {
 		try {
-            writer.write(Utils.SOFTMAX+","+0+","+true+"\n");
+            writer.write(Utils.SOFTMAX+","+0+","+false+"\n");
             Utils.printMatrix(theta, writer);
 			writer.close();
 		}
