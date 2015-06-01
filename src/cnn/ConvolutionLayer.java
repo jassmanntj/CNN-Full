@@ -1,8 +1,8 @@
 package cnn;
 
 import Jama.Matrix;
-import cnn.mobile.DeviceConvPoolLayer;
-import cnn.mobile.DeviceConvolutionLayer;
+import mobile.DeviceConvPoolLayer;
+import mobile.DeviceConvolutionLayer;
 import org.jblas.DoubleMatrix;
 
 import java.io.*;

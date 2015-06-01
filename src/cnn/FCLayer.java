@@ -4,7 +4,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 
 import Jama.Matrix;
-import cnn.mobile.DeviceFCLayer;
+import mobile.DeviceFCLayer;
 import org.jblas.DoubleMatrix;
 
 /**

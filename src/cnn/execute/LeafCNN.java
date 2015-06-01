@@ -48,20 +48,21 @@ public class LeafCNN {
             labels = loader.getLabels(i, false, false, batchSizeLoad);
             DoubleMatrix[][] testImages = loader.getTestArr(i, false, false, batchSizeLoad);
             DoubleMatrix testLabels = loader.getTestLabels(i, false, false, batchSizeLoad);
-            int convLayers = 2;
-            ConvPoolLayer[] cls = new ConvPoolLayer[convLayers*2];
+            int convLayers = 3;
+            ConvPoolLayer[] cls = new ConvPoolLayer[5];
             cls[0] = new ConvolutionLayer(numFeatures, channels, patchDim, lambda, dropout, Utils.PRELU);
-            cls[2] = new ConvolutionLayer(numFeatures, numFeatures, patchDim2, lambda, dropout, Utils.PRELU);
+            cls[2] = new ConvolutionLayer(numFeatures, numFeatures, patchDim, lambda, dropout, Utils.PRELU);
+            cls[3] = new ConvolutionLayer(numFeatures, numFeatures, patchDim2, lambda, dropout, Utils.PRELU);
             //cl1.pretrain(images, numFeatures, 10);
             cls[1] = new PoolingLayer(poolDim, PoolingLayer.MAX);
-            cls[3] = new PoolingLayer(poolDim, PoolingLayer.MAX);
+            cls[4] = new PoolingLayer(poolDim, PoolingLayer.MAX);
 
-            FCLayer sa = new FCLayer(numFeatures * 14 * 19, hiddenSize, lambda, dropout, Utils.PRELU);
-            //FCLayer sa2 = new FCLayer(hiddenSize, hiddenSize, lambda, dropout, Utils.PRELU);
+            FCLayer sa = new FCLayer(numFeatures * 13*18, hiddenSize, lambda, dropout, Utils.PRELU);
+            FCLayer sa2 = new FCLayer(hiddenSize, hiddenSize, lambda, dropout, Utils.PRELU);
 
             SoftmaxClassifier sc = new SoftmaxClassifier(lambda, hiddenSize, labels.columns);
-            FCLayer[] saes = {sa}; //{sa, sa2};
-            NeuralNetwork cnn = new NeuralNetwork(cls, saes, sc, "TestNNd"+i);
+            FCLayer[] saes = {sa, sa2}; //{sa, sa2};
+            NeuralNetwork cnn = new NeuralNetwork(cls, saes, sc, "TestNNe"+i);
             cnn.train(images, labels, testImages, testLabels, iterations, batchSize, momentum, alpha, i);
             compareClasses(Utils.computeResults(cnn.compute(testImages, batchSize)), testLabels, labelMap);
         }

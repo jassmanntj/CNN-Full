@@ -1,6 +1,6 @@
 package cnn;
 
-import cnn.mobile.DeviceConvPoolLayer;
+import mobile.DeviceConvPoolLayer;
 import org.jblas.DoubleMatrix;
 
 import java.io.BufferedWriter;

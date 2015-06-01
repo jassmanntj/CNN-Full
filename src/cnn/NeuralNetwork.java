@@ -1,8 +1,8 @@
 package cnn;
 
-import cnn.mobile.DeviceConvPoolLayer;
-import cnn.mobile.DeviceFCLayer;
-import cnn.mobile.DeviceNeuralNetwork;
+import mobile.DeviceConvPoolLayer;
+import mobile.DeviceFCLayer;
+import mobile.DeviceNeuralNetwork;
 import org.jblas.DoubleMatrix;
 
 import java.io.*;
@@ -101,7 +101,7 @@ public class NeuralNetwork {
             for(int j = 0; j < lds.length; j++) {
                 System.out.println("FC"+j+": " + lds[j].getA());
             }
-            if(finished) break;
+            //if(finished) break;
         }
         write(name);
     }
@@ -235,34 +235,17 @@ public class NeuralNetwork {
         try {
             ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(filename));
             DeviceConvPoolLayer[] cp = new DeviceConvPoolLayer[cls.length];
-            DeviceFCLayer[] fc = new DeviceFCLayer[lds.length];
+            DeviceFCLayer[] fc = new DeviceFCLayer[lds.length+1];
             for(int i = 0; i < cls.length; i++) {
                 cp[i] = cls[i].getDevice();
             }
             for(int i = 0; i < lds.length; i++) {
                 fc[i] = lds[i].getDevice();
             }
-
+            fc[fc.length-1] = sc.getDevice();
             DeviceNeuralNetwork nn = new DeviceNeuralNetwork(cp, fc);
             out.writeObject(nn);
-
-
-
-
-
-
-
-            FileWriter fw = new FileWriter(filename);
-            BufferedWriter writer = new BufferedWriter(fw);
-            writer.write(cls.length+","+(lds.length+1)+"\n");
-            for (int i = 0; i < cls.length; i++) {
-                cls[i].writeLayer(writer);
-            }
-            for (int i = 0; i < lds.length; i++) {
-                lds[i].writeLayer(writer);
-            }
-            sc.writeLayer(writer);
-            writer.close();
+            out.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

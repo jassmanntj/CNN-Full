@@ -3,6 +3,8 @@ package cnn;
 import java.io.BufferedWriter;
 import java.io.IOException;
 
+import Jama.Matrix;
+import mobile.DeviceFCLayer;
 import org.jblas.DoubleMatrix;
 import org.jblas.MatrixFunctions;
 
@@ -102,5 +104,10 @@ public class SoftmaxClassifier {
 	public DoubleMatrix compute(DoubleMatrix input) {
 		return Utils.activationFunction(Utils.SOFTMAX, input.mmul(theta), 0);
 	}
+
+    public DeviceFCLayer getDevice() {
+        Matrix t = new Matrix(theta.toArray2());
+        return new DeviceFCLayer(Utils.SOFTMAX, 0, t, null);
+    }
 
 }
