@@ -355,6 +355,6 @@ public class ConvolutionLayer extends ConvPoolLayer {
                 t[i][j] = new Matrix(theta[i][j].toArray2());
             }
         }
-        return new DeviceConvolutionLayer(t, b, costFunction, a);
+        return new DeviceConvolutionLayer(t, b, costFunction, a, dropout);
     }
 }

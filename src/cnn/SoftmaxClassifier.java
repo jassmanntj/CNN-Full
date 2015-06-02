@@ -107,7 +107,7 @@ public class SoftmaxClassifier {
 
     public DeviceFCLayer getDevice() {
         Matrix t = new Matrix(theta.toArray2());
-        return new DeviceFCLayer(Utils.SOFTMAX, 0, t, null);
+        return new DeviceFCLayer(Utils.SOFTMAX, 0, t, null, 0);
     }
 
 }

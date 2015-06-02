@@ -215,7 +215,7 @@ public class FCLayer {
     public DeviceFCLayer getDevice() {
         Matrix t = new Matrix(theta.toArray2());
         Matrix b = new Matrix(bias.toArray2());
-        return new DeviceFCLayer(activationFunction, a, t, b);
+        return new DeviceFCLayer(activationFunction, a, t, b, dropout);
     }
 }
 
